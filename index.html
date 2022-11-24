@@ -1,0 +1,427 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+        <title>reveal.js</title>
+
+        <link rel="stylesheet" href="dist/reset.css">
+        <link rel="stylesheet" href="dist/reveal.css">
+        <link rel="stylesheet" href="dist/theme/black.css">
+
+        <!-- Theme used for syntax highlighted code -->
+        <link rel="stylesheet" href="plugin/highlight/zenburn.css">
+
+        <!-- Custom CSS -->
+        <style rel="text/css">
+            .side-by-side {
+                display: flex;
+            }
+
+            .side-by-side > * {
+                flex: initial;
+                margin: 0;
+                width: 50%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="reveal">
+            <div class="slides">
+                <section>
+                  <h2>Tests für Faule</h2>
+                  <h3>Einführung in Property-Based Testing</h3>
+                  <small>Michael Seifert</small>
+                </section>
+                <!--section>
+                  <section>
+                    <picture>
+                        <img src="./js/stadtpalast.jpg">
+                        <figcaption><small>Von Gerd Eichmann - Eigenes Werk, <a href="https://creativecommons.org/licenses/by-sa/4.0" title="Creative Commons Attribution-Share Alike 4.0">CC BY-SA 4.0</a>, <a href="https://commons.wikimedia.org/w/index.php?curid=75709421">Link</a></small></figcaption>
+                    </picture>
+                  </section>
+                  <section>
+                    <picture>
+                        <img src="./js/ottifant.jpg">
+                    </picture>
+                  </section>
+                </section-->
+                <section>
+                  <section>
+                    <h2>Was ist ein Property-Based-Test?</h2>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape class="language-python">
+                    from typing import List, TypeVar
+
+                    T = TypeVar("T", int, float)
+
+                    def max(l: List[T]) -> T:
+                        current_max = None
+                        for element in l:
+                            if current_max is None or element > current_max:
+                                current_max = element
+                        return current_max
+                    </code></pre>
+                    <aside class="notes">Assume we want to test the max() function.</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape class="language-python">
+                    def test_max_returns_maximum_int():
+                        values = [-3, 5, 1]
+                        assert max(values) == 5
+
+                    def test_max_returns_maximum_float():
+                        values = [-3.0, 5.0, 1.0]
+                        assert max(values) == 5.0
+                    </code></pre>
+                    <aside class="notes">Assume we want to test the max() function.</aside>
+                  </section>
+                  <section>
+                    <h3 class="fragment">Reichen zwei Tests aus?</h3>
+                    <pre><code data-trim data-noescape class="language-python">
+                    @pytest.mark.parametrize(
+                        "values, expected_max",
+                        (
+                            ([-3, 5, 1], 5),
+                            ([-3.0, 5.0, 1.0], 5.0),
+                        )
+                    )
+                    def test_max_returns_max(values, expected_max):
+                        assert max(values) == expected_max
+                    </code></pre>
+                    <aside class="notes">Parametrization makes the tests more compact.</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape class="language-python">
+                    @pytest.mark.parametrize(
+                        "values",
+                        (
+                            [-3, 5, 1],
+                            [-3.0, 5.0, 1.0],
+                        )
+                    )
+                    def test_max_returns_max(values):
+                        assert max(values) == sorted(values)[-1]
+                    </code></pre>
+                    <aside class="notes">We just found a property: Max returns the largest value of a list. It would be trivial to add new parametrizations to the test.</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape class="language-python">
+                    @given(
+                        st.one_of(
+                            st.lists(st.integers()),
+                            st.lists(st.floats()),
+                        )
+                    )
+                    def test_max_returns_max(values):
+                        assert max(values) == sorted(values)[-1]
+                    </code></pre>
+                    <pre class="fragment"><code data-trim data-noescape>
+                        def test_max_returns_max(values):
+                    >       assert max(values) == sorted(values)[-1]
+                    E       IndexError: list index out of range
+                    </code></pre>
+                    <aside class="notes">Fails, because it can include an empty list.</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape class="language-python">
+                    from typing import List, TypeVar
+
+                    T = TypeVar("T", int, float)
+
+                    def max(l: List[T]) -> T:
+                        current_max = None
+                        for element in l:
+                            if current_max is None or element > current_max:
+                                current_max = element
+                        return current_max
+                    </code></pre>
+                    <aside class="notes">The implementation does not account for empty list.</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape data-line-numbers="6-7" class="language-python">
+                    from typing import List, TypeVar
+
+                    T = TypeVar("T", int, float)
+
+                    def max(l: List[T]) -> T:
+                        if not l:
+                            raise ValueError()
+                        current_max = None
+                        for element in l:
+                            if current_max is None or element > current_max:
+                                current_max = element
+                        return current_max
+                    </code></pre>
+                    <pre class="fragment"><code data-trim data-noescape class="language-python">
+                    def test_max_raises_when_input_is_empty():
+                        with pytest.raises(ValueError):
+                            max([])
+                    </code></pre>
+                    <aside class="notes">The implementation does not account for empty list. Let's fix it and add a test.</aside>
+                  </section>
+                  <!-- section>
+                    <pre><code data-trim data-noescape data-line-numbers="3-4" class="language-python">
+                    @given(
+                        st.one_of(
+                            st.lists(st.integers(), min_size=1),
+                            st.lists(st.floats(), min_size=1),
+                        )
+                    )
+                    def test_max_returns_max(values):
+                        assert max(values) == sorted(values)[-1]
+                    </code></pre>
+                    <pre class="fragment"><code data-trim data-noescape>
+                        def test_max_returns_max(values):
+                    >       assert max(values) == sorted(values)[-1]
+                    E       assert nan == nan
+                    E        +  where nan = max([nan])
+                    </code></pre>
+                    <aside class="notes">Fails, because NaN cannot be compared. Did we account for this case in the implementation?</aside>
+                  </section>
+                  <section>
+                    <pre><code data-trim data-noescape data-line-numbers="4" class="language-python">
+                    @given(
+                        st.one_of(
+                            st.lists(st.integers(), min_size=1),
+                            st.lists(st.floats(allow_nan=False), min_size=1),
+                        )
+                    )
+                    def test_max_returns_max(values):
+                        expected_max = sorted(values)[-1]
+                        assert max(values) == expected_max
+                    </code></pre>
+                  </section-->
+                  <section>
+                    <h3>Take aways</h3>
+                    <ul>
+                        <li class="fragment">Als Autor von Source Code schreibt man im Allgemeinen keine Tests, die Fehler aufdecken.</li>
+                        <li class="fragment">Property-Based Testing generiert mehrere Testfälle, die eine Eigenschaft der Software überprüft.</li>
+                    </ul>
+                  </section>
+                </section>
+                <section>
+                    <section>
+                        <h3>Warum Property-Based Testing?</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                            def square(i: int) -> int:
+                                return i*i
+                        </code></pre>
+                    </section>
+                    <section>
+                        <pre><code data-trim data-noescape class="language-python">
+                            def test_square_positive_number():
+                                number = 42
+                                result = square(number)
+                                assert result == 1764
+                        </code></pre>
+                        <pre class="fragment"><code data-trim data-noescape class="language-python">
+                            def test_square_negative_number():
+                                number = -5
+                                result = square(number)
+                                assert result == 25
+                        </code></pre>
+                        <pre class="fragment"><code data-trim data-noescape class="language-python">
+                            def test_square_zero():
+                                number = 0
+                                result = square(number)
+                                assert result == 0
+                        </code></pre>
+                    </section>
+                    <section>
+                        <pre><code data-trim data-noescape class="language-python">
+                            @given(st.integers())
+                            def test_square(number: int):
+                                assert square(number) == number**2
+                        </code></pre>
+                    </section>
+                    <section>
+                        <pre><code data-trim data-noescape>
+                            0
+                            120
+                            0
+                            -5476758948831415126
+                            0
+                            -27053
+                            -105
+                            9066180397792449019
+                            -60
+                            118
+                            -25198
+                            -5425
+                            -56
+                            -1
+                        </code></pre>
+                    </section>
+                    <section>
+                        <h3>Warum Property-Based Testing?</h3>
+                        <p>Verbesserte Wartbarkeit</p>
+                        <p class="fragment">Potentiell bessere Testabdeckung</p>
+                    </section>
+                </section>
+                <section>
+                    <section>
+                        <h3>Warum Property-Based Testing?</h3>
+                        <picture class="fragment">
+                            <img src="./js/signal.png">
+                        </picture>
+                    </section>
+                    <section>
+                        <pre><code data-trim data-noescape class="language-python">
+                            class Waveform:
+                                samples: list[int]
+
+                                def amplitude(self) -> int:
+                                    ...
+                        </code></pre>
+                        <pre class="fragment"><code data-trim data-noescape class="language-python">
+                            def amplify_loudness(
+                                audio_signal: Waveform,
+                                amplification: float,
+                            ) -> Waveform:
+                                ...
+                        </code></pre>
+                    </section>
+                    <section>
+                        <pre><code data-trim data-noescape class="language-python">
+                            def test_amplify_loudness_increases_amplitude(
+                                signal: Waveform,
+                                amplification: float
+                            ):
+                                amplified = amplify_loudness(waveform, amplification)
+
+                                assert amplified.amplitude > signal.amplitude
+                        </code></pre>
+                        <pre class="fragment"><code data-trim data-noescape class="language-python">
+                            def test_amplify_loudness_does_not_modify_sample_count(
+                                signal: Waveform,
+                                amplification: float
+                            ):
+                                amplified = amplify_loudness(waveform, amplification)
+
+                                assert len(amplified.samples) == len(signal.samples)
+                        </code></pre>
+                    </section>
+                    <section>
+                        <p>Property-Based Testing erlaubt das Testen von Funktionen ohne Kenntnis über das exakte Ergebnis</p>
+                    </section>
+                </section>
+                <section>
+                    <section>
+                        <h2>Herangehensweise</h2>
+                    </section>
+                    <section>
+                        <h3>Fuzzing</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                        @given(
+                            st.lists(st.integers())
+                            | st.lists(st.floats())
+                            | st.lists(st.text())
+                        )
+                        def test_sort(a_list):
+                            custom_sort(a_list)
+                        </code></pre>
+                        <aside class="notes">Note there is not assertion. Just running your code with diverse input is already very effective at finding bugs.</aside>
+                    </section>
+                    <section>
+                        <h3>Differenzielle Tests</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                        @given(
+                            st.lists(
+                                st.text()
+                            )
+                        )
+                        def test_my_custom_sort(l):
+                            assert custom_sort(l) == sorted(l)
+                        </code></pre>
+                        <aside class="notes">Compare to a known good implementation</aside>
+                    </section>
+                    <section>
+                        <h3>Roundtrips</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                        @given(st.binary())
+                        def test_base64(binary):
+                            encoded = b64encode(binary)
+                            decoded = b64decode(encoded)
+                            assert decoded == binary
+                        </code></pre>
+                        <aside class="notes">Even if you have to implement only one part of the roundtrip, consider implementing the other part in the test code.</aside>
+                    </section>
+                    <section>
+                        <h3>Metamorphe Tests</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                        @given(st.integers(min_value=0))
+                        def test_negative_square_equals_square(n):
+                            assert square(n) == square(-n)
+                        </code></pre>
+                        <pre class="fragment"><code data-trim data-noescape class="language-python">
+                        @given(st.integers(min_value=0))
+                        def test_square_is_strictly_monotonic(n):
+                            assert square(n) < square(n + 1)
+                        </code></pre>
+                        <aside class="notes"></aside>
+                    </section>
+                    <section>
+                        <h3>Algebraische Eigenschaften</h3>
+                        <pre><code data-trim data-noescape class="language-python">
+                        @given(st.integers())
+                        def test_sign_is_idempotent(n):
+                            assert sign(n) == sign(sign(n))
+                        </code></pre>
+                        <aside class="notes">Handy for Web APIs</aside>
+                    </section>
+                    <section>
+                        <p>Fuzzing</p>
+                        <p>Differenzielle Tests</p>
+                        <p>Roundtrips</p>
+                        <p>Metamorphe Tests</p>
+                        <p>Algebraische Eigenschaften</p>
+                    </section>
+                </section>
+                <section>
+                    <h2>Warum kein Property-Based Testing?</h2>
+                    <p class="fragment">Erhöht Laufzeit von Tests</p>
+                </section>
+                <section>
+                    <h3>Libraries</h3>
+                    <p>Python: <a href="https://hypothesis.readthedocs.io">Hypothesis</a></p>
+                    <p>JavaScript: <a href="https://jsverify.github.io/">JSVerify</a></p>
+                    <p>TypeScript: <a href="https://www.npmjs.com/package/fast-check">fast-check</a></p>
+                    <p>Java: <a href="https://pholser.github.io/junit-quickcheck/site/1.0/">junit-quickcheck</a></p>
+                </section>
+                <section>
+                    <figure>
+                        <blockquote cite="https://www.cs.yale.edu/homes/perlis-alan/quotes.html">
+                            <p>There are two ways to write error-free programs; only the third one works.</p>
+                        </blockquote>
+                        <figcaption><small>—Alan J. Perlis, <cite>Epigrams in Programming (1982)</cite></small></figcaption>
+                    </figure>
+                    <div class="fragment">
+                        <p></p>
+                        <p>www.seifertm.de</p>
+                        <p>LinkedIn, GitHub: @seifertm</p>
+                        <p>Twitter: @seifertm0</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <script src="dist/reveal.js"></script>
+        <script src="plugin/notes/notes.js"></script>
+        <script src="plugin/markdown/markdown.js"></script>
+        <script src="plugin/highlight/highlight.js"></script>
+        <script>
+            // More info about initialization & config:
+            // - https://revealjs.com/initialization/
+            // - https://revealjs.com/config/
+            Reveal.initialize({
+                hash: true,
+
+                // Learn about plugins: https://revealjs.com/plugins/
+                plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+            });
+        </script>
+    </body>
+</html>
